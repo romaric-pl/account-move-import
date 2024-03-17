@@ -460,11 +460,16 @@ class AccountMoveImport(models.TransientModel):
                 account = str(int(account))
             elif isinstance(account, int):
                 account = str(account)
+            partner = row[3].value
+            if isinstance(partner, float):
+                partner = str(int(partner))
+            elif isinstance(partner, int):
+                partner = str(partner)
             vals = {
                 'date': datetime(*xlrd.xldate_as_tuple(row[0].value, wb.datemode)),
                 'journal': row[1].value,
                 'account': account,
-                'partner': row[3].value or False,
+                'partner': partner or False,
                 'analytic': row[4].value or False,
                 'name': row[5].value,
                 'debit': row[6].value,
@@ -622,11 +627,13 @@ class AccountMoveImport(models.TransientModel):
                 ('company_id', '=', company_id),
                 ('company_id', '=', False),
                 ('ref', '!=', False),
-                ('parent_id', '=', False),
+                ("active", "in", [True, False]),
             ],
-            ['ref'])
+            ['ref','commercial_partner_id'])
         for l in partner_sr:
-            speeddict[l['ref'].upper()] = l['id']
+            speeddict[l['ref'].upper()] = l['commercial_partner_id'][0]
+            logger.info("speeddict"+str(type(l['ref'].upper()))+" :: "+str(l['ref'].upper())+" id : "+str(l['id'])+" partner : "+str(l['commercial_partner_id'][0]))
+        logger.info(str(speeddict))
         return speeddict
 
     def _prepare_speeddict(self, company_id):
@@ -692,8 +699,9 @@ class AccountMoveImport(models.TransientModel):
             if not l.get('account_id'):
                 errors['account'].setdefault(l['account'], []).append(l['line'])
             if l.get('partner'):
-                if l['partner'] in speeddict['partner']:
-                    l['partner_id'] = speeddict['partner'][l['partner']]
+                if str(l['partner']).upper() in speeddict['partner']:
+                    l['partner_id'] = speeddict['partner'][str(l['partner']).upper()]
+                    logger.info(speeddict['partner'][str(l['partner']).upper()])
                 else:
                     errors['partner'].setdefault(l['partner'], []).append(l['line'])
             if l.get('analytic'):
@@ -721,8 +729,8 @@ class AccountMoveImport(models.TransientModel):
                         else:
                             errors['analytic'].setdefault(ana_account_code, []).append(l['line'])
 
-            if l['journal'] in speeddict['journal']:
-                l['journal_id'] = speeddict['journal'][l['journal']]
+            if str(l['journal']).upper() in speeddict['journal']:
+                l['journal_id'] = speeddict['journal'][str(l['journal']).upper()]
             else:
                 errors['journal'].setdefault(l['journal'], []).append(l['line'])
             if not l.get('date'):
@@ -776,7 +784,7 @@ class AccountMoveImport(models.TransientModel):
                     comp_cur.is_zero(l['debit'])):
                 logger.info('Skip line %d which has debit=credit=0', l['line'])
                 continue
-            move_name = l.get('move_name')
+            move_name = l.get('move_name') or l.get('ref')
             if split_move_method == 'move_name':
                 if not move_name:
                     errors['other'].append(_(
