@@ -189,10 +189,18 @@ class AccountMoveImport(models.TransientModel):
         pivot = self.file2pivot(fileobj, file_bytes)
         fileobj.close()
         logger.debug('pivot before update: %s', pivot)
+        logger.info(' LOG_IMPORT *** [step 1/4] START clean_strip_pivot ***')
         self.clean_strip_pivot(pivot)
+        logger.info(' LOG_IMPORT *** END clean_strip_pivot ***')
+        logger.info(' LOG_IMPORT *** [step 2/4] START update_pivot ***')
         self.update_pivot(pivot)
+        logger.info(' LOG_IMPORT *** END update_pivot ***')
+        logger.info(' LOG_IMPORT *** [step 3/4] START create_moves_from_pivot ***')
         moves = self.create_moves_from_pivot(pivot, post=self.post_move)
+        logger.info(' LOG_IMPORT *** END create_moves_from_pivot ***')
+        logger.info(' LOG_IMPORT *** [step 4/4] START reconcile_move_lines ***')
         self.reconcile_move_lines(moves)
+        logger.info(' LOG_IMPORT *** END reconcile_move_lines ***')
         action = self.env["ir.actions.actions"]._for_xml_id(
             "account.action_move_journal_line")
         # We need to remove from context 'search_default_posted': 1
@@ -212,7 +220,11 @@ class AccountMoveImport(models.TransientModel):
         return action
 
     def clean_strip_pivot(self, pivot):
+        i = 0
+        z = len(pivot)
         for l in pivot:
+            i += 1
+            logger.info(' LOG_IMPORT_DETAIL *** [step 1/4] clean_strip_pivot %s sur %s  ***' % (i,z))
             for key, value in l.items():
                 if value:
                     if isinstance(value, str):
@@ -226,7 +238,11 @@ class AccountMoveImport(models.TransientModel):
         force_move_line_name = self.force_move_line_name
         force_journal_code =\
             self.force_journal_id and self.force_journal_id.code or False
+        i = 0
+        z = len(pivot)
         for l in pivot:
+            i += 1
+            logger.info(' LOG_IMPORT_DETAIL *** [step 2/4] update_pivot %s sur %s  ***' % (i,z))
             if force_move_date:
                 l['date'] = force_move_date
             if force_move_line_name:
@@ -674,7 +690,11 @@ class AccountMoveImport(models.TransientModel):
         for key in key2label.keys():
             errors[key] = {}
         # MATCHES + CHECKS
+        i = 0
+        z = len(pivot) 
         for l in pivot:
+            i += 1
+            logger.info(' LOG_IMPORT_DETAIL *** [step 3.1/4] check in create_moves_from_pivot %s sur %s  ***' % (i,z))
             assert l.get('line') and isinstance(l.get('line'), int), \
                 'missing line number'
             if l['account'] in speeddict['account']:
@@ -777,7 +797,11 @@ class AccountMoveImport(models.TransientModel):
         comp_cur = self.company_id.currency_id
         seq = self.env['ir.sequence'].next_by_code('account.move.import')
         cur_move = {}
+        i = 0
+        z = len(pivot)
         for l in pivot:
+            i += 1
+            logger.info(' LOG_IMPORT_DETAIL *** [step 3.2/4] prepare on create_moves_from_pivot %s sur %s  ***' % (i,z))
             if (
                     skip_null_lines and
                     comp_cur.is_zero(l['credit']) and
@@ -821,7 +845,11 @@ class AccountMoveImport(models.TransientModel):
                 "The journal entry that ends on the last line is not "
                 "balanced (balance is %s).") % cur_balance)
         rmoves = self.env['account.move']
+        i = 0
+        z = len(moves)
         for move in moves:
+            i += 1
+            logger.info(' LOG_IMPORT_DETAIL *** [step 3.3/4] create on create_moves_from_pivot %s sur %s  ***' % (i,z))
             rmoves += amo.create(move)
         logger.info(
             'Account moves IDs %s created via file import' % rmoves.ids)
@@ -865,7 +893,11 @@ class AccountMoveImport(models.TransientModel):
                 torec[line.import_reconcile] |= line
             else:
                 torec[line.import_reconcile] = line
+        i = 0
+        z = len(torec)
         for rec_ref, lines_to_rec in torec.items():
+            i += 1
+            logger.info(' LOG_IMPORT_DETAIL *** [step 4/4] reconcile_move_lines %s sur %s  ***' % (i,z))
             if len(lines_to_rec) < 2:
                 logger.warning(
                     "Skip reconcile of ref '%s' because "
