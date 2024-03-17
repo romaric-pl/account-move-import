@@ -622,11 +622,11 @@ class AccountMoveImport(models.TransientModel):
                 ('company_id', '=', company_id),
                 ('company_id', '=', False),
                 ('ref', '!=', False),
-                ('parent_id', '=', False),
+                ("active", "in", [True, False]),
             ],
-            ['ref'])
+            ['ref','commercial_partner_id'])
         for l in partner_sr:
-            speeddict[l['ref'].upper()] = l['id']
+            speeddict[l['ref'].upper()] = l['commercial_partner_id'][0]
         return speeddict
 
     def _prepare_speeddict(self, company_id):
